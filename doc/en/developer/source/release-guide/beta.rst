@@ -1,7 +1,7 @@
 .. _release_guide_beta:
 
 Release Guide (Beta)
-===================
+====================
 
 This guide details the process of performing a GeoServer release.
 
@@ -16,14 +16,40 @@ Notify developer lists
 
 It is good practice to notify the `GeoServer developer list <https://lists.sourceforge.net/lists/listinfo/geoserver-devel>`_ of the intention to make the release a few days in advance, even though the release date has been agreed upon before hand. GeoServer releases are usually made in conjunction with GeoTools releases, so the GeoTools developer list should also be notified of the associated GeoTools release a few days in advance.
 
-On the day the release is being made is it also good practice to send a warning
-to the list asking that developers refrain from committing until the release tag
-has been created.
 
 Prerequisites
 -------------
 
-TODO: More or less the same as the existing release guide.
+The following are necessary to perform a GeoServer release:
+
+#. Commit access to GeoServer `GIT <https://github.com/>`_
+#. Edit access to the GeoServer Blog
+#. Administration rights to the GeoServer bug tracker (JIRA)
+#. Write access to GeoServer Maven Repository
+#. release/file management privileges in sourceforge
+
+If a parallel GeoTools release is being preformed, see the GeoTools Release Guide. Alternatively you can (nicely) ask one of the GeoTools developers to perform the release for you.
+
+Versions and revisions
+----------------------
+
+Unlike in the past, we don't require developers to perform a code freeze as we will be releasing from Geotools and GeoServer version that have passed the CITE test.
+
+To optain the GeoServer and Geotools GIT revision that have passed the `CITE test <http://hudson.opengeo.org/hudson/view/cite/>`_, navigate to the latest run of the CITE test on hudson and view it's console output and select to view its full log::
+
+	example: http://hudson.opengeo.org/hudson/view/cite/job/cite-wfs-1.1-master/526/consoleFull
+	
+Perform a search on the log for 'git revision' and you should obtain the following.::
+
+	version = 2.3-SNAPSHOT
+	git revision = 68cbe445ca378e0dd04405870ef95c852189c1b0
+	git branch = 68cbe445ca378e0dd04405870ef95c852189c1b0
+	build date = 08-Jul-2012 03:36
+	geotools version = 9-SNAPSHOT
+	geotools revision = 9517eebf412ce5cda354e7945672293c37cddcc4
+
+Since Geotools are normally release in parallel with GeoServer, it is advisable to use the Geotools version number such as 8.0 rather then its svn revision number 
+when performing an official release
 
 Build the Release
 -----------------
