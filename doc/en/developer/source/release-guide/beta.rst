@@ -3,13 +3,7 @@
 Release Guide (Beta)
 ====================
 
-This guide details the process of performing a GeoServer release.
-
-.. note::
-
-   This guide is still a work in progress. For now the official release guide
-   remains to be :ref:`release_guide`.
-   
+This guide details the process of performing a GeoServer release.   
 
 Notify developer lists
 ----------------------
@@ -36,8 +30,8 @@ Versions and revisions
 Unlike in the past, we don't require developers to perform a code freeze as we will be releasing from Geotools and GeoServer version that have passed the CITE test.
 
 To optain the GeoServer and Geotools GIT revision that have passed the `CITE test <http://hudson.opengeo.org/hudson/view/cite/>`_, navigate to the latest run of the CITE test on hudson and view it's console output and select to view its full log::
-
-	example: http://hudson.opengeo.org/hudson/view/cite/job/cite-wfs-1.1-master/526/consoleFull
+	
+	 example: http://hudson.opengeo.org/hudson/view/cite/job/cite-wfs-1.1-master/526/consoleFull
 	
 Perform a search on the log for 'git revision' and you should obtain the following.::
 
@@ -48,7 +42,7 @@ Perform a search on the log for 'git revision' and you should obtain the followi
 	geotools version = 9-SNAPSHOT
 	geotools revision = 9517eebf412ce5cda354e7945672293c37cddcc4
 
-Since Geotools are normally release in parallel with GeoServer, it is advisable to use the Geotools version number such as 8.0 rather then its svn revision number 
+Since Geotools are normally release in parallel with GeoServer, it is advisable to use the Geotools version number such as 8.0 rather then its git revision number 
 when performing an official release
 
 Build the Release
@@ -57,15 +51,14 @@ Build the Release
 #. Navigate to `GeoServer Hudson <http://hudson.opengeo.org/hudson>`_.
 #. Run the ``geoserver-release`` job. The job takes the following parameters:
 
-   * ``BRANCH`` - The branch to release from, "trunk", "2.1.x", etc...
-   * ``REV`` - The subversion revision number to release from. If left blank the
-     latest revision on the ``BRANCH`` being released is used.
-   * ``VERSION`` - The version/name of the release to build, "2.1.4", "2.2",
-     etc...
+   * ``BRANCH`` - The branch to release from, "master", "2.1.x", etc...
+   * ``REV`` - The git revision number to release from. eg, "24ae10fe662c....". If 
+     left blank the latest revision on the ``BRANCH`` being released is used.
+   * ``VERSION`` - The version/name of the release to build, "2.1.4", "2.2", etc...
    * ``GT_VERSION`` - The GeoTools version to include in the release. This may 
      be specified as a version number such as "8.0" or "2.7.5". Alternatively 
-     the version may be specified as a subversion branch/revision pair in the 
-     form ``<branch>@<revision>``. For example "trunk@12345".
+     the version may be specified as a git branch/revision pair in the 
+     form ``<branch>@<revision>``. For example "master@36ba65jg53.....".
    * ``GWC_VERSION`` - The GeoWebCache version to include in the release. This
      may be specified as a version number such as "1.3-RC3". Alternatively the
      version may be specified as a git revision of the form 
@@ -118,9 +111,9 @@ Publish the Release
 -------------------
 
 #. Navigate to `GeoServer Hudson <http://hudson.opengeo.org/hudson>`_.
-#. Run the ``geoserver-release-publish`` job. The job takes a single parameter 
-   that is the ``VERSION`` specified above.
-#. Navigate to `Sourceforge <http://sourceforge.net/projects/geoserver/>`_ and
+#. Run the ``geoserver-release-publish`` job. The job takes two parameter 
+   that is the ``VERSION`` specified above and the branch being released from.
+#. Navigate to `Sourceforge <http://sourceforge.net/projects/geoserver/>`__ and
    verify that the artifacts have been uploaded properly.
 #. Set the necessary flags on the ``.exe``, ``.dmg`` and ``.bin`` artifacts so 
    that they show up as the appropriate default for users downloading on the 
@@ -135,4 +128,141 @@ to the SourceForge FRS server.
 Announce the Release
 --------------------
 
-TODO: Take from the existing release guide.
+Mailing lists
+`````````````
+
+Send an email to both the developers list and users list announcing the
+release. The message should be relatively short. The following is an example::
+
+   Subject: GeoServer 1.7.1 Released
+
+   The GeoServer team is happy to announce the release of GeoServer 1.7.1.
+   The release is available for download from:
+
+   http://geoserver.org/display/GEOS/GeoServer+1.7.1
+   
+   This release comes with some exciting new features. The new and
+   noteworthy include:
+   
+      * KML Super Overlay and Regionating Support
+      * KML Extrude Support
+      * KML Reflector Improvements
+      * Mac OS X Installer
+      * Dutch Translation
+      * Improved Style for Web Admin Interface
+      * New SQL Server DataStore Extension
+      * Improved Oracle DataStore Extension
+      * Default Templates per Namespace
+   
+   Along with many other improvements and bug fixes. The entire change log
+   for the 1.7.1 series is available in the issue tracker:
+   
+   http://jira.codehaus.org/browse/GEOS/fixforversion/14502
+   
+   A very special thanks to all those who contributed bug fixes, new
+   features, bug reports, and testing to this release.
+   
+   --
+   The GeoServer Team
+
+SourceForge
+```````````
+
+#. Log in to `SourceForge <http://sourceforge.net/account/login.php>`__.
+#. Edit the release, and scroll down to the bottom of the page.
+#. Check the **I'm sure** check box, and click the **Send Notice** button.
+
+   .. figure:: sfnotice.png
+      :align: center
+  
+#. Repeat for the extension release.
+
+GeoServer Blog
+``````````````
+
+.. note:: 
+
+   This step requires an account on http://blog.geoserver.org
+
+#. Log into the `GeoServer Blog <http://blog.geoserver.org/wp-login.php>`_.
+
+#. Create a new post. The post should be more "colorful" than the average 
+   announcement. It is meant to market and show off any and all new
+   features. Examples of previous posts:
+
+   * http://blog.geoserver.org/2008/12/09/geoserver-171-released/
+   * http://blog.geoserver.org/2008/10/27/geoserver-170-released/
+
+#. Do not publish the post. Instead present it to the GeoServer outreach 
+   team for review, and they will publish it.
+
+SlashGeo
+````````
+
+.. note:: 
+
+   This step requires an account on http://slashgeo.org
+
+#. Go to http://slashgeo.org, and log in, creating an account if necessary.
+
+#. Click the **Submit Story** link on the left hand side of the page. 
+   Examples of previous stories:
+
+   * http://technology.slashgeo.org/technology/08/12/09/1745249.shtml
+   * http://industry.slashgeo.org/article.pl?sid=08/10/27/137216
+
+FreeGIS
+```````
+
+Send an email to ``bjoern dot broscheit at uni-osnabrueck dot de``. 
+Example::
+
+  Subject: GeoServer update for freegis
+
+  GeoServer 1.7.1 has been released with some exciting new features. The big
+  push for this release has been improved KML support. The new and noteworthy 
+  include:
+
+    * KML Super Overlay and Regionating Support
+    * KML Extrude Support
+    * KML Reflector Improvements
+    * Mac OS X Installer
+    * Dutch Translation
+    * Improved Style for Web Admin Interface
+    * New SQL Server DataStore Extension
+    * Improved Oracle DataStore Extension
+    * Default Templates per Namespace
+
+  Along with many other improvements and bug fixes. The entire change log for
+  the 1.7.1 series is available in the issue tracker:
+
+  http://jira.codehaus.org/browse/GEOS/fixforversion/14502
+
+FreshMeat
+`````````
+
+.. note:: 
+
+   This step requires an account on http://freshmeat.net/
+
+#. Go to http://freshmeat.net/ and log in.
+#. Search for "geoserver" and click the resulting link.
+#. Click the **add release** link at the top of the page.
+#. Choose the **Default** branch
+#. Enter the version and choose the appropriate **Release focus**.
+
+   .. note::
+
+      The release focus is usually 4,5,6, or 7. Choose which ever is
+      appropriate.
+
+#. Enter a succinct description (less than 600 characters) of the **Changes**.
+#. Update the links to the following fields:
+
+   * Zip
+   * OS X package
+   * Changelog
+
+#. Click the **Step 3** button.
+#. Click the **Finish** button.
+
