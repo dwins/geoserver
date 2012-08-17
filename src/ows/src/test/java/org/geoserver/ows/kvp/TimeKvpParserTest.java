@@ -41,7 +41,40 @@ public class TimeKvpParserTest extends TestCase {
     static{
     	 format = new SimpleDateFormat("yyyy-MM-dd'T'HH'Z'");
     	 format.setTimeZone(TimeKvpParser.UTC_TZ);
-
+    }
+    
+    public void testReducedAccuracy() throws Exception {
+    	DateRange year = TimeKvpParser.getFuzzyDate("2000");
+    	Calendar c = new GregorianCalendar();
+    	c.setTimeZone(TimeZone.getTimeZone("UTC"));
+    	c.clear();
+    	c.set(Calendar.YEAR, 2000);
+    	assertRangeStarts(year, c.getTime());
+    	c.set(Calendar.YEAR, 2001);
+    	c.setTimeInMillis(c.getTimeInMillis() - 1);
+    	assertRangeEnds(year, c.getTime());
+    }
+    
+    public void assertRangeLength(DateRange range, long expectedLength) {
+    	if (range.getMinValue() == null)
+    		fail("Expected finite range, saw: " + range);
+    	if (range.getMaxValue() == null)
+    		fail("Expected finite range, saw: " + range);
+    	long min = range.getMinValue().getTime();
+    	long max = range.getMaxValue().getTime();
+    	assertEquals("Range " + range + " should have length", expectedLength, max - min);
+    }
+    
+    public static void assertRangeStarts(DateRange range, Date expectedStart) {
+    	if (range.getMinValue() == null) 
+    		fail("Expected valid start date in range " + range);
+    	assertEquals("Range " + range + " should have start", expectedStart, range.getMinValue());
+    }
+    
+    public static void assertRangeEnds(DateRange range, Date expectedEnd) {
+    	if (range.getMaxValue() == null)
+    		fail("Expected valid end date in range " + range);
+    	assertEquals("Range " + range + " should have end", expectedEnd, range.getMaxValue());
     }
 
     /**
@@ -69,23 +102,34 @@ public class TimeKvpParserTest extends TestCase {
         List l = new ArrayList((Collection) timeKvpParser.parse(PERIOD));
         // Verify that the list contains at least one element.
         assertFalse(l.isEmpty());
-        assertEquals(format.parse("2007-01-01T12Z"), l.get(0));
-        assertEquals(format.parse("2007-01-03T00Z"), l.get(1));
-        assertEquals(format.parse("2007-01-04T12Z"), l.get(2));
-        assertEquals(format.parse("2007-01-06T00Z"), l.get(3));
-        assertEquals(format.parse("2007-01-07T12Z"), l.get(4));
-        assertEquals(format.parse("2007-01-09T00Z"), l.get(5));
-        assertEquals(format.parse("2007-01-10T12Z"), l.get(6));
-        assertEquals(format.parse("2007-01-12T00Z"), l.get(7));
+        assertInstant(format.parse("2007-01-01T12Z"), l.get(0));
+        assertInstant(format.parse("2007-01-03T00Z"), l.get(1));
+        assertInstant(format.parse("2007-01-04T12Z"), l.get(2));
+        assertInstant(format.parse("2007-01-06T00Z"), l.get(3));
+        assertInstant(format.parse("2007-01-07T12Z"), l.get(4));
+        assertInstant(format.parse("2007-01-09T00Z"), l.get(5));
+        assertInstant(format.parse("2007-01-10T12Z"), l.get(6));
+        assertInstant(format.parse("2007-01-12T00Z"), l.get(7));
         
         l = new ArrayList((Collection) timeKvpParser.parse("2007-01-01T12Z/2007-01-31T12Z/PT01S"));
         // Verify that the list contains at least one element.
         assertFalse(l.isEmpty());
         assertTrue(l.size()==100);
-        assertEquals(format.parse("2007-01-01T12Z"), l.get(0));
+        assertInstant(format.parse("2007-01-01T12Z"), l.get(0));
     }
     
-    public void testContinuousInterval() throws ParseException {
+    private static void assertInstant(Date parse, Object object) {
+    	assertTrue("Should have a DateRange: " + object, object instanceof DateRange);
+    	assertEquals(object + " Should start at", parse, ((DateRange)object).getMinValue());
+    	assertEquals(object + " Should end at", parse, ((DateRange)object).getMaxValue());
+	}
+    
+    private static void assertRange(DateRange range, Date start, Date end) {
+    	assertRangeStarts(range, start);
+    	assertRangeEnds(range, new Date(end.getTime() - 1));
+    }
+
+	public void testContinuousInterval() throws ParseException {
         TimeKvpParser timeKvpParser = new TimeKvpParser("TIME");
         List l = new ArrayList((Collection)  timeKvpParser.parse(CONTINUOUS_PERIOD));
         // Verify that the list contains at least one element.
@@ -93,7 +137,9 @@ public class TimeKvpParserTest extends TestCase {
         assertTrue(l.get(0) instanceof DateRange);
         final DateRange range=(DateRange) l.get(0);
         assertEquals(format.parse("2007-01-01T12Z"), range.getMinValue());
-        assertEquals(format.parse("2007-01-31T12Z"), range.getMaxValue());
+        Date end = format.parse("2007-01-31T13Z");
+        end.setTime(end.getTime() - 1);
+        assertEquals(end, range.getMaxValue());
     }
     
     public void testMixedValues() throws ParseException {
@@ -104,11 +150,11 @@ public class TimeKvpParserTest extends TestCase {
         assertTrue(l.get(0) instanceof DateRange);
         final DateRange range=(DateRange) l.get(0);
         assertEquals(format.parse("2007-01-01T12Z"), range.getMinValue());
-        assertEquals(format.parse("2007-01-31T12Z"), range.getMaxValue());
+        Date end = format.parse("2007-01-31T13Z");
+        end.setTime(end.getTime() - 1);
+        assertEquals(end, range.getMaxValue());
         
-        assertTrue(l.get(1) instanceof Date);
-        final Date date=(Date) l.get(1);
-        assertEquals(format.parse("2007-02-01T12Z"), date);
+        assertRange((DateRange)l.get(1), format.parse("2007-02-01T12Z"), format.parse("2007-02-01T13Z"));
     }
     
     public void testInclusions() throws ParseException {
@@ -120,9 +166,7 @@ public class TimeKvpParserTest extends TestCase {
         assertTrue(l.size()==1);
         assertTrue(l.get(0) instanceof DateRange);
         final DateRange range=(DateRange) l.get(0);
-        assertEquals(format.parse("2007-01-01T12Z"), range.getMinValue());
-        assertEquals(format.parse("2007-01-31T12Z"), range.getMaxValue());
-        
+        assertRange(range, format.parse("2007-01-01T12Z"), format.parse("2007-01-31T13Z"));
     }
     
     public void testOrderedValues() throws Exception {
@@ -132,13 +176,11 @@ public class TimeKvpParserTest extends TestCase {
         // Verify that the list contains at least one element.
         assertFalse(l.isEmpty());
         assertTrue(l.size()==5);
-        assertEquals(format.parse("2007-01-01T12Z"),(Date) l.get(0));
-        assertEquals(format.parse("2007-01-05T12Z"),(Date) l.get(1));
-        assertEquals(format.parse("2007-01-12T12Z"),(Date) l.get(2));
-        assertEquals(format.parse("2007-01-17T12Z"),(Date) l.get(3));
-        assertEquals(format.parse("2007-01-29T12Z"),(Date) l.get(4));
-        
-        
+        assertRange((DateRange) l.get(0), format.parse("2007-01-01T12Z"), format.parse("2007-01-01T13Z"));
+        assertRange((DateRange) l.get(1), format.parse("2007-01-05T12Z"), format.parse("2007-01-05T13Z"));
+        assertRange((DateRange) l.get(2), format.parse("2007-01-12T12Z"), format.parse("2007-01-12T13Z"));
+        assertRange((DateRange) l.get(3), format.parse("2007-01-17T12Z"), format.parse("2007-01-17T13Z"));
+        assertRange((DateRange) l.get(4), format.parse("2007-01-29T12Z"), format.parse("2007-01-29T13Z"));
     }
     
     public void testNegativeYearCompliance() throws Exception {
@@ -147,27 +189,27 @@ public class TimeKvpParserTest extends TestCase {
         cal.setTimeZone(TimeZone.getTimeZone("GMT"));
         
         // base assertion - 0001 is year 1
-        Date date = (Date) ((List)timeKvpParser.parse("0001-06-01")).get(0);
-        cal.setTime(date);
+        DateRange date = (DateRange) ((List)timeKvpParser.parse("01-06-01")).get(0);
+        cal.setTime(date.getMinValue());
         assertEquals(1, cal.get(Calendar.YEAR));
         assertEquals(GregorianCalendar.AD, cal.get(Calendar.ERA));
         
-        date = (Date) ((List)timeKvpParser.parse("0000-06-01")).get(0);
-        cal.setTime(date);
+        date = (DateRange) ((List)timeKvpParser.parse("00-06-01")).get(0);
+        cal.setTime(date.getMinValue());
         // calendar calls it year 1, ISO spec means it's year 0
         // but we're just parsing here...
         assertEquals(1, cal.get(Calendar.YEAR));
         assertEquals(GregorianCalendar.BC, cal.get(Calendar.ERA));
         
         // so, the next year should be 2
-        date = (Date) ((List)timeKvpParser.parse("-0001-06-01")).get(0);
-        cal.setTime(date);
+        date = (DateRange) ((List)timeKvpParser.parse("-01-06-01")).get(0);
+        cal.setTime(date.getMinValue());
         assertEquals(2, cal.get(Calendar.YEAR));
         assertEquals(GregorianCalendar.BC, cal.get(Calendar.ERA));
         
         // now, big negative year compliance (see the spec, appendix D 2.2, pp 57-58)
-        date = (Date) ((List)timeKvpParser.parse("-18000-06-01")).get(0);
-        cal.setTime(date);
+        date = (DateRange) ((List)timeKvpParser.parse("-18000-06-01")).get(0);
+        cal.setTime(date.getMinValue());
         assertEquals(18001, cal.get(Calendar.YEAR));
         assertEquals(GregorianCalendar.BC, cal.get(Calendar.ERA));
     }
