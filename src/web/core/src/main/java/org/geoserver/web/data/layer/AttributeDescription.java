@@ -14,6 +14,7 @@ import java.util.List;
 import org.geoserver.web.wicket.ParamResourceModel;
 import org.geotools.referencing.CRS;
 import org.opengis.referencing.crs.CoordinateReferenceSystem;
+import org.opengis.referencing.FactoryException;
 
 import com.vividsolutions.jts.geom.Geometry;
 import com.vividsolutions.jts.geom.GeometryCollection;
@@ -32,13 +33,11 @@ class AttributeDescription implements Serializable {
             Geometry.class, Point.class, LineString.class, Polygon.class, MultiPoint.class,
             MultiLineString.class, MultiPolygon.class, GeometryCollection.class);
     
-    static final CoordinateReferenceSystem WGS84;
-    
-    static {
+    static final CoordinateReferenceSystem WGS84() {
         try {
-            WGS84 = CRS.decode("EPSG:4326");
-        } catch(Exception e) {
-            throw new RuntimeException(e);
+            return CRS.decode("EPSG:4326");
+        } catch (FactoryException e) {
+            throw new RuntimeException("Unexpected failure while looking up EPSG:4326");
         }
     }
 
@@ -50,7 +49,7 @@ class AttributeDescription implements Serializable {
 
     int size = 100;
 
-    CoordinateReferenceSystem crs = WGS84;
+    CoordinateReferenceSystem crs = WGS84();
 
     /**
      * Returns the localized named of the attribute type

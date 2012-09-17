@@ -31,6 +31,7 @@ import org.opengis.feature.simple.SimpleFeature;
 import org.opengis.feature.simple.SimpleFeatureType;
 import org.opengis.feature.type.AttributeDescriptor;
 import org.opengis.feature.type.GeometryDescriptor;
+import org.opengis.referencing.FactoryException;
 import org.opengis.referencing.crs.CoordinateReferenceSystem;
 import org.opengis.referencing.operation.MathTransform;
 
@@ -45,7 +46,13 @@ public class ExternalSortRegionatingStrategy extends
     /**
      * The feature type for the features that we'll return back from the index
      */
-    static final SimpleFeatureType IDX_FEATURE_TYPE;
+    static final SimpleFeatureType IDX_FEATURE_TYPE() throws FactoryException {
+        SimpleFeatureTypeBuilder tb = new SimpleFeatureTypeBuilder();
+        tb.crs(WGS84());
+        tb.add("point", Point.class);
+        tb.setName("FeatureCentroids");
+        return tb.buildFeatureType();
+    };
 
     /**
      * Java type to H2 type map (covers only types that do not have a size)
@@ -66,12 +73,6 @@ public class ExternalSortRegionatingStrategy extends
         CLASS_MAPPINGS.put(java.sql.Date.class, "DATE");
         CLASS_MAPPINGS.put(java.sql.Time.class, "TIME");
         CLASS_MAPPINGS.put(java.sql.Timestamp.class, "TIMESTAMP");
-        
-        SimpleFeatureTypeBuilder tb = new SimpleFeatureTypeBuilder();
-        tb.crs(WGS84);
-        tb.add("point", Point.class);
-        tb.setName("FeatureCentroids");
-        IDX_FEATURE_TYPE = tb.buildFeatureType();
     }
 
     String attribute;
@@ -197,8 +198,8 @@ public class ExternalSortRegionatingStrategy extends
             // setup the eventual transform
             MathTransform tx = null;
             double[] coords = new double[2];
-            if (!CRS.equalsIgnoreMetadata(nativeCrs, WGS84))
-                tx = CRS.findMathTransform(nativeCrs, WGS84, true);
+            if (!CRS.equalsIgnoreMetadata(nativeCrs, WGS84()))
+                tx = CRS.findMathTransform(nativeCrs, WGS84(), true);
 
             // read all the features and fill the index table
             // make it so the insertion is a single big transaction, should
@@ -287,7 +288,7 @@ public class ExternalSortRegionatingStrategy extends
             }
 
             // prepare the builders we'll use to create all of the features
-            builder = new SimpleFeatureBuilder(IDX_FEATURE_TYPE);
+            builder = new SimpleFeatureBuilder(IDX_FEATURE_TYPE());
             gf = new GeometryFactory();
         }
 

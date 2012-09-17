@@ -40,6 +40,7 @@ import org.opengis.filter.Filter;
 import org.opengis.filter.FilterFactory;
 import org.opengis.filter.identity.FeatureId;
 import org.opengis.geometry.BoundingBox;
+import org.opengis.referencing.FactoryException;
 import org.opengis.referencing.crs.CoordinateReferenceSystem;
 import org.opengis.referencing.operation.MathTransform;
 import org.vfny.geoserver.global.GeoserverDataDirectory;
@@ -64,9 +65,7 @@ public abstract class CachedHierarchyRegionatingStrategy implements
         RegionatingStrategy {
     static Logger LOGGER = Logging.getLogger("org.geoserver.geosearch");
 
-    static final CoordinateReferenceSystem WGS84;
-
-    static final ReferencedEnvelope WORLD_BOUNDS;
+    static final Envelope WORLD_BOUNDS_UNREFERENCED;
 
     static final double MAX_TILE_WIDTH;
 
@@ -85,19 +84,24 @@ public abstract class CachedHierarchyRegionatingStrategy implements
     static {
         try {
             // common geographic info
-            WGS84 = CRS.decode("EPSG:4326");
-            WORLD_BOUNDS = new ReferencedEnvelope(new Envelope(180.0, -180.0,
-                    90.0, -90.0), WGS84);
-            MAX_TILE_WIDTH = WORLD_BOUNDS.getWidth() / 2.0;
+            WORLD_BOUNDS_UNREFERENCED = new Envelope(180, -180, 90, -90);
+            MAX_TILE_WIDTH = WORLD_BOUNDS_UNREFERENCED.getWidth() / 2.0;
 
             // make sure, once and for all, that H2 is around
             Class.forName("org.h2.Driver");
         } catch (Exception e) {
-            throw new RuntimeException(
-                    "Could not initialize the class constants", e);
+            throw new RuntimeException("Could not initialize the class constants", e);
         }
     }
 
+
+    static CoordinateReferenceSystem WGS84() throws FactoryException {
+        return CRS.decode("EPSG:4326");
+    }
+
+    static ReferencedEnvelope WORLD_BOUNDS() throws FactoryException {
+        return new ReferencedEnvelope(WORLD_BOUNDS_UNREFERENCED, WGS84());
+    }
  
 
     /**
@@ -155,7 +159,7 @@ public abstract class CachedHierarchyRegionatingStrategy implements
 
             // make sure the request is within the data bounds, allowing for a
             // small error
-            ReferencedEnvelope requestedEnvelope = context.getRenderingArea().transform(WGS84, true);
+            ReferencedEnvelope requestedEnvelope = context.getRenderingArea().transform(WGS84(), true);
             LOGGER.log(Level.FINE, "Requested tile: {0}", requestedEnvelope);
             dataEnvelope = featureType.getLatLonBoundingBox(); 
 
@@ -379,7 +383,7 @@ public abstract class CachedHierarchyRegionatingStrategy implements
 
             ReferencedEnvelope nativeTileEnvelope = null;
 
-            if (!CRS.equalsIgnoreMetadata(WGS84, nativeCrs)) {
+            if (!CRS.equalsIgnoreMetadata(WGS84(), nativeCrs)) {
                 try {
                     nativeTileEnvelope = tile.getEnvelope().transform(nativeCrs, true);
                 } catch (ProjectionException pe) {
@@ -429,8 +433,8 @@ public abstract class CachedHierarchyRegionatingStrategy implements
                             .getCoordinateReferenceSystem();
                     featureType.getFeatureType().getCoordinateReferenceSystem();
                     if (nativeCRS != null
-                            && !CRS.equalsIgnoreMetadata(nativeCRS, WGS84)) {
-                        tx = CRS.findMathTransform(nativeCRS, WGS84);
+                            && !CRS.equalsIgnoreMetadata(nativeCRS, WGS84())) {
+                        tx = CRS.findMathTransform(nativeCRS, WGS84());
                     }
                 }
 
@@ -615,10 +619,13 @@ public abstract class CachedHierarchyRegionatingStrategy implements
 
         private ReferencedEnvelope envelope(long x, long y, long z) {
             double tileSize = MAX_TILE_WIDTH / Math.pow(2, z);
-            double xMin = x * tileSize + WORLD_BOUNDS.getMinX();
-            double yMin = y * tileSize + WORLD_BOUNDS.getMinY();
-            return new ReferencedEnvelope(xMin, xMin + tileSize, yMin, yMin
-                    + tileSize, WGS84);
+            double xMin = x * tileSize + WORLD_BOUNDS_UNREFERENCED.getMinX();
+            double yMin = y * tileSize + WORLD_BOUNDS_UNREFERENCED.getMinY();
+            try {
+                return new ReferencedEnvelope(xMin, xMin + tileSize, yMin, yMin + tileSize, WGS84());
+            } catch (FactoryException e) {
+                throw new RuntimeException("Unexpected projection lookup failure for EPSG:4326");
+            }
         }
 
         /**
@@ -627,11 +634,9 @@ public abstract class CachedHierarchyRegionatingStrategy implements
         public Tile(ReferencedEnvelope wgs84Envelope) {
             z = Math.round(Math.log(MAX_TILE_WIDTH / wgs84Envelope.getWidth())
                     / Math.log(2));
-            x = Math.round(((wgs84Envelope.getMinimum(0) - WORLD_BOUNDS
-                    .getMinimum(0)) / MAX_TILE_WIDTH)
+            x = Math.round(((wgs84Envelope.getMinimum(0) - WORLD_BOUNDS_UNREFERENCED.getMinX()) / MAX_TILE_WIDTH)
                     * Math.pow(2, z));
-            y = Math.round(((wgs84Envelope.getMinimum(1) - WORLD_BOUNDS
-                    .getMinimum(1)) / MAX_TILE_WIDTH)
+            y = Math.round(((wgs84Envelope.getMinimum(1) - WORLD_BOUNDS_UNREFERENCED.getMinY()) / MAX_TILE_WIDTH)
                     * Math.pow(2, z));
             envelope = envelope(x, y, z);
         }
