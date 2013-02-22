@@ -52,7 +52,7 @@ final public class IconPropertyInjector {
         return result;
     }
     
-    public boolean isStatic(Expression ex) {
+    private boolean isStatic(Expression ex) {
         return (Boolean) ex.accept(IsStaticExpressionVisitor.VISITOR, null);
     }
 

@@ -21,6 +21,7 @@ import java.util.Date;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -37,6 +38,8 @@ import org.geoserver.wms.WMSMapContent;
 import org.geoserver.wms.featureinfo.FeatureHeightTemplate;
 import org.geoserver.wms.featureinfo.FeatureTemplate;
 import org.geoserver.wms.featureinfo.FeatureTimeTemplate;
+import org.geoserver.wms.icons.IconProperties;
+import org.geoserver.wms.icons.IconPropertyExtractor;
 import org.geotools.data.DataUtilities;
 import org.geotools.factory.CommonFactoryFinder;
 import org.geotools.feature.type.DateUtil;
@@ -56,6 +59,7 @@ import org.geotools.styling.PointSymbolizer;
 import org.geotools.styling.PolygonSymbolizer;
 import org.geotools.styling.Rule;
 import org.geotools.styling.SLD;
+import org.geotools.styling.Style;
 import org.geotools.styling.Symbolizer;
 import org.geotools.styling.TextSymbolizer;
 import org.geotools.util.NumberRange;
@@ -331,14 +335,13 @@ public abstract class KMLMapTransformer extends KMLTransformerBase {
          * @param symbolizers
          *            a list of Symbolizers which apply to the feature.
          */
-        protected void encodeStyle(SimpleFeature feature, List<Symbolizer> symbolizers) {
+        protected void encodeStyle(SimpleFeature feature, Style style, List<Symbolizer> symbolizers) {
             if (!symbolizers.isEmpty()) {
                 // start the style
                 start("Style");
 
-                Symbolizer[] symbolizerArray = (Symbolizer[]) symbolizers
-                        .toArray(new Symbolizer[symbolizers.size()]);
-                encodeStyle(feature, symbolizerArray);
+                Symbolizer[] symbolizerArray = (Symbolizer[]) symbolizers.toArray(new Symbolizer[symbolizers.size()]);
+                encodeStyle(feature, style, symbolizerArray);
 
                 // end the style
                 end("Style");
@@ -404,7 +407,7 @@ public abstract class KMLMapTransformer extends KMLTransformerBase {
         /**
          * Encodes the provided set of symbolizers as KML styles.
          */
-        protected void encodeStyle(SimpleFeature feature, Symbolizer[] symbolizers) {
+        protected void encodeStyle(SimpleFeature feature, Style wholeStyle,  Symbolizer[] symbolizers) {
             try {
                 /**
                  * This causes some performance overhead, but we should separate out repeated styles
@@ -439,16 +442,18 @@ public abstract class KMLMapTransformer extends KMLTransformerBase {
                     // to click on
                     encodeDefaultIconStyle(feature);
                 } else {
-                    Iterator<PointSymbolizer> iter = iconStyles.iterator();
-                    while (iter.hasNext()) {
-                        PointSymbolizer sym = (PointSymbolizer) iter.next();
-                        try {
-                            Style2D style = styleFactory.createStyle(feature, sym, scaleRange);
-                            encodePointStyle(feature, style, sym);
-                        } catch (IllegalArgumentException iae) {
-                            LOGGER.fine(iae.getMessage() + " for " + sym.toString());
-                        }
-                    }
+                    IconProperties properties = IconPropertyExtractor.extractProperties(wholeStyle, feature);
+                    encodeIconStyle(wholeStyle, properties);
+//                    Iterator<PointSymbolizer> iter = iconStyles.iterator();
+//                    while (iter.hasNext()) {
+//                        PointSymbolizer sym = (PointSymbolizer) iter.next();
+//                        try {
+//                            Style2D style = styleFactory.createStyle(feature, sym, scaleRange);
+//                            encodePointStyle(feature, style, sym);
+//                        } catch (IllegalArgumentException iae) {
+//                            LOGGER.fine(iae.getMessage() + " for " + sym.toString());
+//                        }
+//                    }
                 }
 
                 // Labels / Text
@@ -502,6 +507,32 @@ public abstract class KMLMapTransformer extends KMLTransformerBase {
             } catch (Exception e) {
                 LOGGER.log(Level.WARNING, "Error occurred during style encoding", e);
             }
+        }
+
+        private void encodeIconStyle(Style style, IconProperties properties) {
+            Double opacity = properties.getOpacity();
+            Double scale = properties.getScale();
+            Double heading = properties.getHeading();
+            
+            start("IconStyle");
+            if (opacity != null) {
+                String mask = String.format("#%02xffffff", Math.round(opacity * 255));
+                element("colorMask", mask);
+            }
+            
+            if (scale != null) {
+                element("scale", String.valueOf(scale));
+            }
+            
+            if (heading != null) {
+                element("heading", String.valueOf(heading));
+            }
+            
+            start("Icon");
+            element("href", properties.href(mapContent.getRequest().getBaseUrl(), style.getName()));
+            end("Icon");
+            
+            end("IconStyle");
         }
 
         /**
@@ -855,15 +886,14 @@ public abstract class KMLMapTransformer extends KMLTransformerBase {
             }
         }
 
-        protected void encodePlacemark(SimpleFeature feature, List<Symbolizer> symbolizers, KMLLookAt lookAtOps) {
-            encodePlacemark(feature, symbolizers, null, lookAtOps);
+        protected void encodePlacemark(SimpleFeature feature, Style style, List<Symbolizer> symbolizers, KMLLookAt lookAtOps) {
+            encodePlacemark(feature, style, symbolizers, null, lookAtOps);
         }
 
         /**
          * Encodes a KML Placemark from a feature and optional name.
          */
-        protected void encodePlacemark(SimpleFeature feature, List<Symbolizer> symbolizers,
-                Geometry markGeometry, KMLLookAt lookAtOps) {
+        protected void encodePlacemark(SimpleFeature feature, Style style, List<Symbolizer> symbolizers, Geometry markGeometry, KMLLookAt lookAtOps) {
             final Geometry geometry = featureGeometry(feature);
             final Coordinate centroid = geometryCentroid(geometry);
             final Envelope bounds = geometry.getEnvelopeInternal();
@@ -928,7 +958,7 @@ public abstract class KMLMapTransformer extends KMLTransformerBase {
                 LOGGER.log(Level.FINE, "", e);
             }
 
-            encodeStyle(feature, symbolizers);
+            encodeStyle(feature, style, symbolizers);
 
             // encode extended data (kml 2.2)
             encodeExtendedData(feature);

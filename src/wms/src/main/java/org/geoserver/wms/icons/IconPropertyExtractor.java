@@ -24,11 +24,11 @@ public final class IconPropertyExtractor {
         this.style = style;
     }
 
-    private Map<String,String> propertiesFor(SimpleFeature feature) {
+    private IconProperties propertiesFor(SimpleFeature feature) {
         return new FeatureProperties(feature).properties();
     }
 
-    public static Map<String,String> extractProperties(Style style, SimpleFeature feature) {
+    public static IconProperties extractProperties(Style style, SimpleFeature feature) {
         return new IconPropertyExtractor(MiniRule.minify(style)).propertiesFor(feature);
     }
 
@@ -52,7 +52,7 @@ public final class IconPropertyExtractor {
             this.feature = feature;
         }
 
-        public Map<String, String> properties() {
+        public IconProperties properties() {
             Map<String,String> props = new TreeMap<String,String>();
             for (int i = 0; i < style.size(); i++) {
                 List<MiniRule> rules = style.get(i);
@@ -76,7 +76,7 @@ public final class IconPropertyExtractor {
                     }
                 }
             }
-            return props;
+            return IconProperties.generator(null, null, null, props);
         }
 
         public boolean isStatic(Expression ex) {

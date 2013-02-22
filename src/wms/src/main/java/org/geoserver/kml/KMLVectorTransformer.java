@@ -16,6 +16,7 @@ import org.geotools.data.simple.SimpleFeatureIterator;
 import org.geotools.geometry.jts.ReferencedEnvelope;
 import org.geotools.map.Layer;
 import org.geotools.styling.FeatureTypeStyle;
+import org.geotools.styling.Style;
 import org.geotools.styling.Symbolizer;
 import org.geotools.xml.transform.Translator;
 import org.opengis.feature.simple.SimpleFeature;
@@ -159,7 +160,7 @@ public class KMLVectorTransformer extends KMLMapTransformer {
             encodeSchemas(features);
 
             // encode the layers
-            encode(features, featureTypeStyles);
+            encode(features, mapLayer.getStyle(), featureTypeStyles);
 
             // encode the legend
             // encodeLegendScreenOverlay();
@@ -207,7 +208,7 @@ public class KMLVectorTransformer extends KMLMapTransformer {
             // the code is at the moment in KML3VectorTransformer
         }
 
-        protected void encode(SimpleFeatureCollection features, FeatureTypeStyle[] styles) {
+        protected void encode(SimpleFeatureCollection features, Style style, FeatureTypeStyle[] styles) {
             // grab a reader and process
             SimpleFeatureIterator reader = null;
 
@@ -221,7 +222,7 @@ public class KMLVectorTransformer extends KMLMapTransformer {
                     try {
                         List<Symbolizer> symbolizers = filterSymbolizers(feature, styles);
                         if (symbolizers.size() > 0) {
-                            encodePlacemark(feature, symbolizers, lookAtOpts);
+                            encodePlacemark(feature, style, symbolizers, lookAtOpts);
                         }
                     } catch (RuntimeException t) {
                         // if the stream has been closed by the client don't keep on going forward,

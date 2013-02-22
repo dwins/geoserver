@@ -49,7 +49,7 @@ public class IconPropertiesTest {
     }
 
     private String encode(Style style, SimpleFeature feature) {
-        Map<String, String> iconProperties = IconPropertyExtractor.extractProperties(style, feature);
+        Map<String, String> iconProperties = IconPropertyExtractor.extractProperties(style, feature).getProperties();
         return queryString(iconProperties);
     }
 
