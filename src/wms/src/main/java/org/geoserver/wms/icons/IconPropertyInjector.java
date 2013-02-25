@@ -2,12 +2,14 @@ package org.geoserver.wms.icons;
 
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.util.Arrays;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
 import org.geotools.factory.CommonFactoryFinder;
 import org.geotools.filter.visitor.IsStaticExpressionVisitor;
+import org.geotools.renderer.style.ExpressionExtractor;
 import org.geotools.styling.ExternalGraphic;
 import org.geotools.styling.Fill;
 import org.geotools.styling.Graphic;
@@ -16,16 +18,21 @@ import org.geotools.styling.PointSymbolizer;
 import org.geotools.styling.Stroke;
 import org.geotools.styling.Style;
 import org.geotools.styling.StyleFactory;
+import org.geotools.styling.Symbol;
+import org.geotools.styling.visitor.DuplicatingStyleVisitor;
 import org.opengis.filter.FilterFactory;
 import org.opengis.filter.expression.Expression;
 import org.opengis.style.GraphicalSymbol;
 
-final public class IconPropertyInjector {
+final public class IconPropertyInjector extends DuplicatingStyleVisitor {
     private final FilterFactory filterFactory;
+    private final StyleFactory styleFactory;
+    
     private final Map<String, String> properties;
 
     private IconPropertyInjector(Map<String, String> properties) {
         this.filterFactory = CommonFactoryFinder.getFilterFactory();
+        this.styleFactory = CommonFactoryFinder.getStyleFactory();
         this.properties = properties;
     }
     
@@ -41,8 +48,7 @@ final public class IconPropertyInjector {
                     String key = i + "." + j + "." + k;
                     if (properties.containsKey(key)) {
                         PointSymbolizer ptSym = origRule.symbolizers.get(k);
-                        injectPointSymbolizer(key, ptSym);
-                        resultSymbolizers.add(ptSym);
+                        resultSymbolizers.add(injectPointSymbolizer(key, ptSym));
                     }
                 }
                 resultRules.add(new MiniRule(null, false, resultSymbolizers));
@@ -64,90 +70,201 @@ final public class IconPropertyInjector {
         return filterFactory.literal(properties.get(key));
     }
     
-    private void injectPointSymbolizer(String key, PointSymbolizer pointSymbolizer) {
-        if (pointSymbolizer.getGraphic() != null) {
-            injectGraphic(key, pointSymbolizer.getGraphic());
+    private PointSymbolizer injectPointSymbolizer(String key, PointSymbolizer original) {
+        PointSymbolizer copy = styleFactory.createPointSymbolizer();
+        if (original.getGraphic() != null) {
+            copy.setGraphic(injectGraphic(key, original.getGraphic()));
         }
+        return copy;
     }
     
-    private void injectGraphic(String key, Graphic graphic) {
-        if (shouldUpdate(key + ".opacity", graphic.getOpacity())) {
-            graphic.setOpacity(getLiteral(key + ".opacity"));
+    private Graphic injectGraphic(String key, Graphic original) {
+        final ExternalGraphic[] externalGraphics;
+        final Mark[] marks;
+        final Symbol[] symbols = new Symbol[0];
+        final Expression opacity;
+        final Expression size;
+        final Expression rotation;
+        
+        if (shouldUpdate(key + ".opacity", original.getOpacity())) {
+            opacity = getLiteral(key + ".opacity");
+        } else {
+            opacity = null;
         }
-        if (shouldUpdate(key + ".rotation", graphic.getRotation())) {
-            graphic.setRotation(getLiteral(key + ".rotation"));
+        
+        if (shouldUpdate(key + ".rotation", original.getRotation())) {
+            rotation = getLiteral(key + ".rotation");
+        } else {
+            rotation = null;
         }
-        if (shouldUpdate(key + ".size", graphic.getSize())) {
-            graphic.setSize(getLiteral(key + ".size"));
+        
+        if (shouldUpdate(key + ".size", original.getSize())) {
+            size = getLiteral(key + ".size");
+        } else {
+            size = null;
         }
-        if (!graphic.graphicalSymbols().isEmpty()) {
-            GraphicalSymbol symbol = graphic.graphicalSymbols().get(0);
-            if (symbol instanceof Mark) {
-                injectMark(key, (Mark) symbol);
-            } else if (symbol instanceof ExternalGraphic) {
-                injectExternalGraphic(key, (ExternalGraphic) symbol);
+        
+        if (!original.graphicalSymbols().isEmpty()) {
+            List<Mark> markList = new ArrayList<Mark>();
+            List<ExternalGraphic> externalGraphicList = new ArrayList<ExternalGraphic>();
+            for (GraphicalSymbol symbol : original.graphicalSymbols()) {
+                if (symbol instanceof Mark) {
+                    markList.add(injectMark(key, (Mark) symbol));
+                } else if (symbol instanceof ExternalGraphic) {
+                    externalGraphicList.add(injectExternalGraphic(key, (ExternalGraphic) symbol));
+                }
             }
+            marks = markList.toArray(new Mark[0]);
+            externalGraphics = externalGraphicList.toArray(new ExternalGraphic[0]);
+        } else {
+            marks = new Mark[0];
+            externalGraphics = new ExternalGraphic[0];
         }
+        return styleFactory.createGraphic(externalGraphics, marks, symbols, opacity, size, rotation);
     }
 
-    private void injectExternalGraphic(String key, ExternalGraphic symbol) {
+    private ExternalGraphic injectExternalGraphic(String key, ExternalGraphic original) {
         try {
-            symbol.setLocation(new URL(properties.get(key + ".url")));
+            final String format = original.getFormat();
+            final URL location;
+            final Expression locationExpression;
+            if (original.getLocation() == null) {
+                locationExpression = null;
+            } else {
+                locationExpression = ExpressionExtractor.extractCqlExpressions(original.getLocation().toExternalForm());
+            }
+            
+            if (locationExpression == null || isStatic(locationExpression)) {
+                location = original.getLocation();
+            } else {
+                location = new URL(properties.get(key + ".url"));
+            }
+            return styleFactory.createExternalGraphic(location, format);
         } catch (MalformedURLException e) {
-            // Just ignore the invalid URL
-            // TODO: Log at finer or finest level?
+            throw new RuntimeException(e);
         }
     }
 
-    private void injectMark(String key, Mark mark) {
-        if (shouldUpdate(key + ".name", mark.getWellKnownName())) {
-            mark.setWellKnownName(getLiteral(key + ".name"));
+    private Mark injectMark(String key, Mark mark) {
+        final Expression wellKnownName;
+        final Stroke stroke;
+        final Fill fill;
+        final Expression size = null; // size and fill are handled only at the PointSymbolizer level - bug?
+        final Expression rotation = null;
+        
+        if (mark.getWellKnownName() == null || isStatic(mark.getWellKnownName())) {
+            wellKnownName = mark.getWellKnownName();
+        } else {
+            wellKnownName = getLiteral(key + ".name");
         }
-        if (mark.getFill() != null) {
-            injectFill(key + ".fill", mark.getFill());
+        
+        if (mark.getFill() == null) {
+            fill = null;
+        } else {
+            fill = injectFill(key + ".fill", mark.getFill());
         }
-        if (mark.getStroke() != null) {
-            injectStroke(key + ".stroke", mark.getStroke());
+        
+        if (mark.getStroke() == null) {
+            stroke = null;
+        } else {
+            stroke = injectStroke(key + ".stroke", mark.getStroke());
         }
+        return styleFactory.createMark(wellKnownName, stroke, fill, size, rotation);
     }
 
-    private void injectStroke(String key, Stroke stroke) {
-        if (shouldUpdate(key + ".color", stroke.getColor())) {
-            stroke.setColor(getLiteral(key + ".color"));
+    private Stroke injectStroke(String key, Stroke stroke) {
+        final Expression color;
+        final Expression width;
+        final Expression opacity; 
+        final Expression lineJoin;
+        final Expression lineCap;
+        final float[] dashArray;
+        final Expression dashOffset;
+        final Graphic graphicFill;
+        final Graphic graphicStroke;
+        
+        if (stroke.getColor() == null || isStatic(stroke.getColor())) {
+            color = stroke.getColor();
+        } else {
+            color = getLiteral(key + ".color");
         }
-        if (shouldUpdate(key + ".dashoffset", stroke.getDashOffset())) {
-            stroke.setDashOffset(getLiteral(key + ".dashoffset"));
+        
+        if (stroke.getDashOffset() == null || isStatic(stroke.getDashOffset())) {
+            dashOffset = stroke.getDashOffset();
+        } else {
+            dashOffset = getLiteral(key + ".linecap");
         }
-        if (shouldUpdate(key + ".linecap", stroke.getLineCap())) {
-            stroke.setLineCap(getLiteral(key + ".linecap"));
+
+        if (stroke.getLineCap() == null || isStatic(stroke.getDashOffset())) {
+            lineCap = stroke.getLineCap();
+        } else {
+            lineCap = getLiteral(key + ".linecap");
         }
-        if (shouldUpdate(key + ".linejoin", stroke.getLineJoin())) {
-            stroke.setLineJoin(getLiteral(key + ".linejoin"));
+        
+        if (stroke.getLineJoin() == null || isStatic(stroke.getLineJoin())) {
+            lineJoin = stroke.getLineJoin();
+        } else {
+            lineJoin = getLiteral(key + ".linejoin");
         }
-        if (shouldUpdate(key + ".opacity", stroke.getOpacity())) {
-            stroke.setOpacity(getLiteral(key + ".opacity"));
+        
+        if (stroke.getOpacity() == null || isStatic(stroke.getOpacity())) {
+            opacity = stroke.getOpacity();
+        } else {
+            opacity = getLiteral(key + ".opacity");
         }
-        if (shouldUpdate(key + ".width", stroke.getWidth())) {
-            stroke.setWidth(getLiteral(key + ".width"));
+
+        if (stroke.getWidth() == null || isStatic(stroke.getWidth())) {
+            width = stroke.getOpacity();
+        } else {
+            width = getLiteral(key + ".opacity");
         }
-        if (stroke.getGraphicStroke() != null) {
-            injectGraphic(key + ".graphic", stroke.getGraphicStroke());
+        
+        if (stroke.getGraphicStroke() == null) {
+            graphicStroke = null;
+        } else {
+            graphicStroke = injectGraphic(key + ".graphic", stroke.getGraphicStroke());
         }
-        if (stroke.getGraphicFill() != null) {
-            injectGraphic(key + ".graphic", stroke.getGraphicFill());
+
+        if (stroke.getGraphicFill() == null) {
+            graphicFill = null;
+        } else {
+            graphicFill = injectGraphic(key + ".graphic", stroke.getGraphicFill());
         }
+
+        if (stroke.getDashArray() == null) {
+            dashArray = null;
+        } else {
+            dashArray = Arrays.copyOf(stroke.getDashArray(), stroke.getDashArray().length);
+        }
+
+        return styleFactory.createStroke(color, width, opacity, lineJoin, lineCap, dashArray, dashOffset, graphicFill, graphicStroke);
     }
 
-    private void injectFill(String key, Fill fill) {
-        if (shouldUpdate(key + ".color", fill.getColor())) {
-            fill.setColor(getLiteral(key + ".color"));
+    private Fill injectFill(String key, Fill fill) {
+        final Expression color;
+        final Expression backgroundColor = null;
+        final Expression opacity;
+        final Graphic graphicFill;
+
+        if (fill.getColor() == null || isStatic(fill.getColor())) {
+            color = fill.getColor();
+        } else {
+            color = getLiteral(key + ".color");
         }
-        if (shouldUpdate(key + ".opacity", fill.getOpacity())) {
-            fill.setOpacity(getLiteral(key + ".opacity"));
+
+        if (fill.getOpacity() == null || isStatic(fill.getOpacity())) {
+            opacity = fill.getOpacity();
+        } else {
+            opacity = getLiteral(key + ".opacity");
         }
-        if (fill.getGraphicFill() != null) {
-            injectGraphic(key + ".graphic", fill.getGraphicFill());
+
+        if (fill.getGraphicFill() == null) {
+            graphicFill = null;
+        } else {
+            graphicFill = injectGraphic(key + ".graphic", fill.getGraphicFill());
         }
+        
+        return styleFactory.createFill(color, backgroundColor, opacity, graphicFill);
     }
 
     public static Style injectProperties(Style style, Map<String, String> properties) {

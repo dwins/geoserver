@@ -54,6 +54,7 @@ public final class IconPropertyExtractor {
 
         public IconProperties properties() {
             Map<String,String> props = new TreeMap<String,String>();
+            Double size = null;
             for (int i = 0; i < style.size(); i++) {
                 List<MiniRule> rules = style.get(i);
                 for (int j = 0; j < rules.size(); j++) {
@@ -71,16 +72,43 @@ public final class IconPropertyExtractor {
                             PointSymbolizer sym = rule.symbolizers.get(k);
                             if (sym.getGraphic() != null) {
                                 addGraphicProperties(i + "." + j + "." + k, sym.getGraphic(), props);
+                                Double gRotation = graphicRotation(sym.getGraphic());
+                                Double gSize = graphicSize(sym.getGraphic(), gRotation);
+                                if (size == null || (gSize != null && gSize > size)) {
+                                    size = gSize;
+                                }
                             }
                         }
                     }
                 }
             }
-            return IconProperties.generator(null, null, null, props);
+            if (size != null) size = size / 16d;
+            return IconProperties.generator(null, size, null, props);
         }
 
         public boolean isStatic(Expression ex) {
             return (Boolean) ex.accept(IsStaticExpressionVisitor.VISITOR, null);
+        }
+        
+        private Double graphicRotation(Graphic g) {
+            if (g.getRotation() != null) {
+                return g.getRotation().evaluate(feature, Double.class);
+            } else {
+                return null;
+            }
+        }
+        
+        private Double graphicSize(Graphic g, Double rotation) {
+            if (g.getSize() != null) {
+                Double size = g.getSize().evaluate(feature, Double.class);
+                if (size != null && rotation != null) {
+                    size = size * Math.abs(Math.cos(Math.toRadians(rotation))) +
+                           size * Math.abs(Math.sin(Math.toRadians(rotation)));
+                }
+                return size;
+            } else {
+                return null; // TODO: ExternalGraphics...
+            }
         }
 
         public void addGraphicProperties(String prefix, Graphic g, Map<String,String> props) {
