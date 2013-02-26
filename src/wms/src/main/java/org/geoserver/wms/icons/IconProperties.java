@@ -1,5 +1,8 @@
 package org.geoserver.wms.icons;
 
+import java.io.UnsupportedEncodingException;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.Map;
 
 import org.geoserver.ows.URLMangler.URLType;
@@ -50,6 +53,30 @@ public abstract class IconProperties {
             public Map<String, String> getProperties() {
                 return styleProperties;
             }
+            
+            @Override
+            public String getIconName(Style style) {
+                try {
+                    final MessageDigest digest = MessageDigest.getInstance("MD5");
+                    digest.update(style.getName().getBytes("UTF-8"));
+                    for (Map.Entry<String, String> property : styleProperties.entrySet()) {
+                        digest.update(property.getKey().getBytes("UTF-8"));
+                        digest.update(property.getValue().getBytes("UTF-8"));
+                    }
+                    final byte[] hash = digest.digest();
+                    final StringBuilder builder = new StringBuilder();
+                    for (byte b : hash) {
+                        builder.append(String.format("%02x", b));
+                    }
+                    return builder.toString();
+                } catch (NoSuchAlgorithmException e) {
+                    throw new RuntimeException(e);
+                } catch (UnsupportedEncodingException e) {
+                    throw new RuntimeException(e);
+                }
+            }
         };
     }
+
+    public abstract String getIconName(Style style);
 }

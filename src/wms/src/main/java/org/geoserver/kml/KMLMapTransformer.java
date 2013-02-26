@@ -40,6 +40,7 @@ import org.geoserver.wms.featureinfo.FeatureTemplate;
 import org.geoserver.wms.featureinfo.FeatureTimeTemplate;
 import org.geoserver.wms.icons.IconProperties;
 import org.geoserver.wms.icons.IconPropertyExtractor;
+import org.geoserver.wms.icons.IconPropertyInjector;
 import org.geotools.data.DataUtilities;
 import org.geotools.factory.CommonFactoryFinder;
 import org.geotools.feature.type.DateUtil;
@@ -100,6 +101,8 @@ public abstract class KMLMapTransformer extends KMLTransformerBase {
     static Logger LOGGER = org.geotools.util.logging.Logging.getLogger("org.geoserver.kml");
 
     private static final FilterFactory ff = CommonFactoryFinder.getFilterFactory(null);
+    
+    private final Map<String, Style> iconStyles;
 
     /**
      * The scale denominator.
@@ -191,10 +194,11 @@ public abstract class KMLMapTransformer extends KMLTransformerBase {
 
     }
 
-    public KMLMapTransformer(WMS wms, WMSMapContent mapContent, Layer mapLayer) {
+    public KMLMapTransformer(WMS wms, WMSMapContent mapContent, Layer mapLayer, Map<String, Style> iconStyles) {
         this.wms = wms;
         this.mapContent = mapContent;
         this.mapLayer = mapLayer;
+        this.iconStyles = iconStyles;
 
         this.vectorNameDescription = KMLUtils.getKMAttr(mapContent.getRequest(), wms);
     }
@@ -444,16 +448,6 @@ public abstract class KMLMapTransformer extends KMLTransformerBase {
                 } else {
                     IconProperties properties = IconPropertyExtractor.extractProperties(wholeStyle, feature);
                     encodeIconStyle(wholeStyle, properties);
-//                    Iterator<PointSymbolizer> iter = iconStyles.iterator();
-//                    while (iter.hasNext()) {
-//                        PointSymbolizer sym = (PointSymbolizer) iter.next();
-//                        try {
-//                            Style2D style = styleFactory.createStyle(feature, sym, scaleRange);
-//                            encodePointStyle(feature, style, sym);
-//                        } catch (IllegalArgumentException iae) {
-//                            LOGGER.fine(iae.getMessage() + " for " + sym.toString());
-//                        }
-//                    }
                 }
 
                 // Labels / Text
@@ -510,9 +504,31 @@ public abstract class KMLMapTransformer extends KMLTransformerBase {
         }
 
         private void encodeIconStyle(Style style, IconProperties properties) {
-            Double opacity = properties.getOpacity();
-            Double scale = properties.getScale();
-            Double heading = properties.getHeading();
+            if (iconStyles != null) {
+                encodeInlineIconStyle(style, properties);
+            } else {
+                encodeLiveIconStyle(style, properties);
+            }
+        }
+
+        private void encodeInlineIconStyle(Style style, IconProperties properties) {
+            final String name = properties.getIconName(style);
+            if (!iconStyles.containsKey(name)) {
+                final Style injectedStyle = IconPropertyInjector.injectProperties(style, properties.getProperties());
+                iconStyles.put(name, injectedStyle);
+            }
+            final String path = "icons/" + name + ".png";
+            start("IconStyle");
+            start("Icon");
+            element("href", path);
+            end("Icon");
+            end("IconStyle");
+        }
+
+        private void encodeLiveIconStyle(Style style, IconProperties properties) {
+            final Double opacity = properties.getOpacity();
+            final Double scale = properties.getScale();
+            final Double heading = properties.getHeading();
             
             start("IconStyle");
             if (opacity != null) {

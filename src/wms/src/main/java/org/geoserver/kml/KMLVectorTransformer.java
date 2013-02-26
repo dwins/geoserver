@@ -6,6 +6,7 @@ package org.geoserver.kml;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 import java.util.logging.Level;
 
 import org.geoserver.config.GeoServer;
@@ -39,17 +40,25 @@ import org.xml.sax.SAXException;
 public class KMLVectorTransformer extends KMLMapTransformer {
 
     private KMLLookAt lookAtOpts;
+    private final Map<String, Style> iconStyles;
 
     public KMLVectorTransformer(WMS wms, WMSMapContent mapContent, Layer mapLayer) {
         this(wms, mapContent, mapLayer, null);
     }
 
-    public KMLVectorTransformer(WMS wms, WMSMapContent mapContent, Layer mapLayer,
-            KMLLookAt lookAtOpts) {
-        super(wms, mapContent, mapLayer);
+    public KMLVectorTransformer(WMS wms, WMSMapContent mapContent, Layer mapLayer, KMLLookAt lookAtOpts) {
+        this(wms, mapContent, mapLayer, lookAtOpts, null);
 
         setNamespaceDeclarationEnabled(false);
         this.lookAtOpts = lookAtOpts;
+    }
+    
+    public KMLVectorTransformer(WMS wms, WMSMapContent mapContent, Layer mapLayer, KMLLookAt lookAtOpts, Map<String, Style> iconStyles) {
+        super(wms, mapContent, mapLayer, iconStyles);
+        
+        setNamespaceDeclarationEnabled(false);
+        this.lookAtOpts = lookAtOpts;
+        this.iconStyles = iconStyles;
     }
 
     /**

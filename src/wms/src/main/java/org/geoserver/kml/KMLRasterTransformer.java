@@ -76,7 +76,7 @@ public class KMLRasterTransformer extends KMLMapTransformer {
     }
 
     public KMLRasterTransformer(WMS wms, WMSMapContent mapContent, KMLLookAt lookAtOpts) {
-        super(wms, mapContent, null);
+        super(wms, mapContent, null, null);
         this.lookAtOpts = lookAtOpts;
         setNamespaceDeclarationEnabled(false);
     }
