@@ -504,10 +504,10 @@ public abstract class KMLMapTransformer extends KMLTransformerBase {
         }
 
         private void encodeIconStyle(Style style, IconProperties properties) {
-            if (iconStyles != null) {
-                encodeInlineIconStyle(style, properties);
-            } else {
+            if (iconStyles == null || properties.isExternal()) {
                 encodeLiveIconStyle(style, properties);
+            } else {
+                encodeInlineIconStyle(style, properties);
             }
         }
 

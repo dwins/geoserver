@@ -20,7 +20,8 @@ public abstract class IconProperties {
     public abstract String href(String baseURL, String styleName);
     public abstract Style inject(Style base);
     public abstract Map<String, String> getProperties();
-
+    public abstract String getIconName(Style style);
+    public abstract boolean isExternal();
     
     public static IconProperties generator(final Double opacity, final Double scale, final Double heading, final Map<String, String> styleProperties) {
         return new IconProperties() {
@@ -37,6 +38,11 @@ public abstract class IconProperties {
             @Override
             public Double getHeading() {
                 return heading;
+            }
+            
+            @Override 
+            public boolean isExternal() {
+                return false;
             }
 
             @Override
@@ -77,6 +83,48 @@ public abstract class IconProperties {
             }
         };
     }
+    
+    public static IconProperties externalReference(final Double opacity, final Double scale, final Double heading, final String url) {
+        return new IconProperties() {
+            @Override
+            public Double getOpacity() {
+                return opacity;
+            }
 
-    public abstract String getIconName(Style style);
+            @Override
+            public Double getScale() {
+                return scale;
+            }
+
+            @Override
+            public Double getHeading() {
+                return heading;
+            }
+
+            @Override
+            public String href(String baseURL, String styleName) {
+                return url;
+            }
+            
+            @Override
+            public boolean isExternal() {
+                return true;
+            }
+
+            @Override
+            public Style inject(Style base) {
+                throw new RuntimeException("An implementation is missing");
+            }
+
+            @Override
+            public Map<String, String> getProperties() {
+                throw new RuntimeException("An implementation is missing");
+            }
+
+            @Override
+            public String getIconName(Style style) {
+                throw new RuntimeException("An implementation is missing");
+            }
+        };
+    }
 }

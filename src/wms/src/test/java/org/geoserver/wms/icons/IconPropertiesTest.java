@@ -1,6 +1,8 @@
 package org.geoserver.wms.icons;
 
-import static org.junit.Assert.*;
+import static org.geotools.filter.text.ecql.ECQL.toExpression;
+import static org.geotools.filter.text.ecql.ECQL.toFilter;
+import static org.junit.Assert.assertEquals;
 
 import java.awt.Color;
 import java.io.UnsupportedEncodingException;
@@ -21,13 +23,10 @@ import org.geotools.styling.SLD;
 import org.geotools.styling.Style;
 import org.geotools.styling.StyleFactory2;
 import org.geotools.styling.Symbolizer;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.opengis.feature.simple.SimpleFeature;
 import org.opengis.feature.simple.SimpleFeatureType;
 import org.opengis.filter.Filter;
-import static org.geotools.filter.text.ecql.ECQL.toFilter;
-import static org.geotools.filter.text.ecql.ECQL.toExpression;
 
 public class IconPropertiesTest {
     private static final SimpleFeature fieldIs1;
@@ -49,8 +48,9 @@ public class IconPropertiesTest {
     }
 
     private String encode(Style style, SimpleFeature feature) {
-        Map<String, String> iconProperties = IconPropertyExtractor.extractProperties(style, feature).getProperties();
-        return queryString(iconProperties);
+        return IconPropertyExtractor.extractProperties(style, feature)
+                .href("http://example.com/", "test")
+                .replace("http://example.com/rest/render/kml/icon/test?", "");
     }
 
     private String queryString(Map<String, String> params) {
@@ -208,16 +208,16 @@ public class IconPropertiesTest {
 
     @Test
     public void testDynamicURL() throws CQLException, UnsupportedEncodingException {
+        // TODO: This test should overlay two different images
         final PointSymbolizer symbolizer = externalGraphic("http://example.com/foo${field}.png", "image/png");
-        final Style style = styleFromRules(catchAllRule(symbolizer));
-        String url = URLEncoder.encode("http://example.com/", "UTF-8");
-        assertEquals("0.0.0=&0.0.0.url=" + url + "foo1.png", encode(style, fieldIs1));
-        assertEquals("0.0.0=&0.0.0.url=" + url + "foo2.png", encode(style, fieldIs2));
+        final Style style = styleFromRules(catchAllRule(symbolizer, symbolizer));
+        final String url = URLEncoder.encode("http://example.com/", "UTF-8");
+        assertEquals("0.0.0=&0.0.0.url=" + url + "foo1.png&0.0.1=&0.0.1.url=" + url + "foo1.png", encode(style, fieldIs1));
+        assertEquals("0.0.0=&0.0.0.url=" + url + "foo2.png&0.0.1=&0.0.1.url=" + url + "foo2.png", encode(style, fieldIs2));
     }
 
-    @Ignore
+    @Test
     public void testPublicURL() throws CQLException {
-        // TODO: I need to write the API for getting an Icon URL instead of just the styling properties before this test can be implemented
         final PointSymbolizer symbolizer = externalGraphic("http://example.com/foo.png", "image/png");
         final Style style = styleFromRules(catchAllRule(symbolizer));
         assertEquals("http://example.com/foo.png", encode(style, fieldIs1));

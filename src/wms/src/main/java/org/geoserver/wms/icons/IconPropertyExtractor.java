@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 
+import org.geotools.filter.text.cql2.CQLException;
 import org.geotools.filter.visitor.IsStaticExpressionVisitor;
 import org.geotools.renderer.style.ExpressionExtractor;
 import org.geotools.styling.ExternalGraphic;
@@ -16,6 +17,7 @@ import org.geotools.styling.Stroke;
 import org.geotools.styling.Style;
 import org.opengis.feature.simple.SimpleFeature;
 import org.opengis.filter.expression.Expression;
+import org.opengis.style.GraphicalSymbol;
 
 public final class IconPropertyExtractor {
     private List<List<MiniRule>> style;
@@ -53,6 +55,68 @@ public final class IconPropertyExtractor {
         }
 
         public IconProperties properties() {
+            IconProperties singleExternalGraphic = trySingleExternalGraphic();
+            if (singleExternalGraphic != null) {
+                return singleExternalGraphic;
+            } else {
+                return embeddedIconProperties();
+            }
+        }
+        
+        public IconProperties trySingleExternalGraphic() {
+            MiniRule singleRule = null;
+            for (List<MiniRule> rules : style) {
+                boolean applied = false;
+                
+                for (MiniRule rule : rules) {
+                    final boolean applicable = 
+                            (rule.isElseFilter && !applied) ||
+                            (rule.filter == null) ||
+                            (rule.filter.evaluate(feature));
+                    if (applicable) {
+                        if (singleRule == null) {
+                            singleRule = rule;
+                        } else {
+                            return null;
+                        }
+                    }
+                }
+            }
+            if (singleRule == null) {
+                return null;
+            }
+            return isExternalGraphic(singleRule);
+        }
+        
+        public IconProperties isExternalGraphic(MiniRule rule) {
+            if (rule.symbolizers.size() != 1) {
+                return null;
+            }
+            Graphic g = rule.symbolizers.get(0).getGraphic();
+            if (g == null) {
+                return null;
+            }
+            if (g.graphicalSymbols().size() != 1) {
+                return null;
+            }
+            GraphicalSymbol gSym = g.graphicalSymbols().get(0);
+            if (! (gSym instanceof ExternalGraphic)) {
+                return null;
+            }
+            ExternalGraphic exGraphic = (ExternalGraphic) gSym;
+            try {
+                Double opacity = g.getOpacity().evaluate(feature, Double.class);
+                Double size = g.getSize().evaluate(feature, Double.class);
+                if (size != null) size = size / 16d;
+                Double rotation = g.getRotation().evaluate(feature, Double.class);
+                Expression urlExpression = ExpressionExtractor.extractCqlExpressions(exGraphic.getLocation().toExternalForm());
+                return IconProperties.externalReference(opacity, size, rotation, urlExpression.evaluate(feature, String.class));
+            } catch (MalformedURLException e) {
+                throw new RuntimeException(e);
+            }
+        }
+        
+        public IconProperties embeddedIconProperties() {
             Map<String,String> props = new TreeMap<String,String>();
             Double size = null;
             for (int i = 0; i < style.size(); i++) {
@@ -72,8 +136,8 @@ public final class IconPropertyExtractor {
                             PointSymbolizer sym = rule.symbolizers.get(k);
                             if (sym.getGraphic() != null) {
                                 addGraphicProperties(i + "." + j + "." + k, sym.getGraphic(), props);
-                                Double gRotation = graphicRotation(sym.getGraphic());
-                                Double gSize = graphicSize(sym.getGraphic(), gRotation);
+                                final Double gRotation = graphicRotation(sym.getGraphic());
+                                final Double gSize = graphicSize(sym.getGraphic(), gRotation);
                                 if (size == null || (gSize != null && gSize > size)) {
                                     size = gSize;
                                 }
