@@ -33,8 +33,8 @@ public class AvailableWMSLayerResource extends AbstractCatalogResource {
 
     @Override
     protected Object handleObjectGet() {
-        String workspace = (String) getRequest().getAttributes().get( "workspace" );
-        String wmsstore = (String) getRequest().getAttributes().get( "wmsstore" );
+        String workspace = getAttribute("workspace");
+        String wmsstore = getAttribute("wmsstore");
         
         WMSStoreInfo info = catalog.getStoreByName( workspace, wmsstore, WMSStoreInfo.class );
         if ( info == null ) {

@@ -23,8 +23,8 @@ public class WMSStoreFinder extends AbstractCatalogFinder {
 
     @Override
     public Resource findTarget(Request request, Response response) {
-        String ws = (String) request.getAttributes().get( "workspace" );
-        String wms = (String) request.getAttributes().get( "wmsstore" );
+        String ws = getAttribute(request, "workspace");
+        String wms = getAttribute(request, "wmsstore");
         
         //ensure referenced resources exist
         if ( ws != null && catalog.getWorkspaceByName(ws) == null) {
